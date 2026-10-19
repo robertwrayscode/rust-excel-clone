@@ -82,3 +82,10 @@ fn defined_names() {
     assert_eq!(eval(&mut wb, "=Rate*2"), Value::Number(8.0));
     assert_eq!(eval(&mut wb, "=Double(Rate)"), Value::Number(8.0));
 }
+
+#[test]
+fn registry_is_large() {
+    let n = engine::functions::all().len();
+    println!("registered functions: {}", n);
+    assert!(n > 450, "only {} functions", n);
+}
