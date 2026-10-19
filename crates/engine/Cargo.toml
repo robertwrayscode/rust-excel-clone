@@ -1,0 +1,10 @@
+[package]
+name = "engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Spreadsheet engine: workbook model, formula parser/evaluator, Excel functions, file I/O"
+
+[dependencies]
+chrono = "0.4"
+serde = { version = "1", features = ["derive"] }
