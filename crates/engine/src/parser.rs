@@ -557,7 +557,7 @@ impl Parser {
 fn is_refish(e: &Expr) -> bool {
     match e {
         Expr::Ref(_) | Expr::SpillRef(_) | Expr::Name(_) => true,
-        Expr::Call(n, _) => matches!(n.as_str(), "OFFSET" | "INDIRECT" | "INDEX" | "CHOOSE" | "IF"),
+        Expr::Call(n, _) => matches!(n.as_str(), "OFFSET" | "INDIRECT" | "INDEX" | "CHOOSE" | "IF" | "XLOOKUP" | "TRIMRANGE" | "LET" | "IFS" | "SWITCH"),
         Expr::Paren(e) => is_refish(e),
         Expr::Binary(op, _, _) => matches!(op, BinaryOp::Range | BinaryOp::Intersect | BinaryOp::Union),
         _ => false,
