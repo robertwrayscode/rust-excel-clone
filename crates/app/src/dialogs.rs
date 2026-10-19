@@ -239,7 +239,7 @@ pub(crate) fn ok_cancel(ui: &mut Ui) -> (bool, bool) {
     let mut ok = false;
     let mut cancel = false;
     ui.add_space(6.0);
-    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+    ui.allocate_ui_with_layout(vec2(ui.available_width(), 26.0), egui::Layout::right_to_left(egui::Align::Center), |ui| {
         if ui.add(egui::Button::new("Cancel").min_size(vec2(72.0, 24.0))).clicked() {
             cancel = true;
         }
@@ -270,7 +270,7 @@ fn show_dialog(app: &mut App, ctx: &Context, d: &mut Dialog) -> bool {
                     ui.label(t);
                 });
                 ui.add_space(8.0);
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.allocate_ui_with_layout(vec2(ui.available_width(), 26.0), egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.add(egui::Button::new(RichText::new("OK").color(Color32::WHITE)).fill(theme::ACCENT).min_size(vec2(72.0, 24.0))).clicked() {
                         done = true;
                     }
@@ -498,7 +498,7 @@ fn show_dialog(app: &mut App, ctx: &Context, d: &mut Dialog) -> bool {
                     if ui.add_enabled(selected.is_some(), egui::Button::new("Delete")).clicked() {
                         action = Some(2);
                     }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.allocate_ui_with_layout(vec2(ui.available_width(), 26.0), egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.button("Close").clicked() {
                             close = true;
                         }
@@ -573,7 +573,7 @@ fn show_dialog(app: &mut App, ctx: &Context, d: &mut Dialog) -> bool {
                     if ui.add_enabled(keys.len() > 1, egui::Button::new("− Delete Level")).clicked() {
                         keys.pop();
                     }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.allocate_ui_with_layout(vec2(ui.available_width(), 26.0), egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.checkbox(header, "My data has headers");
                     });
                 });
@@ -877,7 +877,7 @@ fn show_dialog(app: &mut App, ctx: &Context, d: &mut Dialog) -> bool {
                     if ui.add_enabled(selected.is_some(), egui::Button::new("Delete Rule")).clicked() {
                         delete = selected.take();
                     }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.allocate_ui_with_layout(vec2(ui.available_width(), 26.0), egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.button("Close").clicked() {
                             close = true;
                         }

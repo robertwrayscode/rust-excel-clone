@@ -318,19 +318,22 @@ fn paint_pie(p: &Painter, area: Rect, data: &ChartData) {
         }
         let sweep = (*v / total) as f32 * std::f32::consts::TAU;
         let col = SERIES_COLORS[i % SERIES_COLORS.len()];
-        // split into convex pieces of at most 45 degrees
-        let pieces = (sweep / (std::f32::consts::PI / 4.0)).ceil().max(1.0) as usize;
-        for k in 0..pieces {
-            let s = a0 + sweep * k as f32 / pieces as f32;
-            let e = a0 + sweep * (k + 1) as f32 / pieces as f32;
-            let mut pts = vec![c];
-            let steps = 8;
-            for j in 0..=steps {
-                let a = s + (e - s) * j as f32 / steps as f32;
-                pts.push(c + vec2(a.cos(), a.sin()) * r);
-            }
-            p.add(Shape::convex_polygon(pts, col, Stroke::NONE));
+        // one triangle-fan mesh per slice (no seams), plus an anti-aliased rim
+        let steps = ((sweep / std::f32::consts::TAU) * 96.0).ceil().max(2.0) as usize;
+        let mut mesh = egui::Mesh::default();
+        mesh.colored_vertex(c, col);
+        let mut rim = Vec::with_capacity(steps + 1);
+        for j in 0..=steps {
+            let a = a0 + sweep * j as f32 / steps as f32;
+            let q = c + vec2(a.cos(), a.sin()) * r;
+            mesh.colored_vertex(q, col);
+            rim.push(q);
         }
+        for j in 0..steps as u32 {
+            mesh.add_triangle(0, j + 1, j + 2);
+        }
+        p.add(Shape::mesh(mesh));
+        p.add(Shape::line(rim, Stroke::new(1.0, col)));
         // separator
         p.line_segment([c, c + vec2(a0.cos(), a0.sin()) * r], Stroke::new(1.5, Color32::WHITE));
         // percentage label

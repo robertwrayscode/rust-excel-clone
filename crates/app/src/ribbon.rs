@@ -41,7 +41,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             if ui.add_enabled(app.doc.undo.can_undo(), egui::Button::new("↶").frame_when_inactive(false)).on_hover_text(undo_tip).clicked() {
                 app.undo();
             }
-            if ui.add(egui::Button::new("🖫").frame_when_inactive(false)).on_hover_text("Save (Ctrl+S)").clicked() {
+            if ui.add(egui::Button::new("💾").frame_when_inactive(false)).on_hover_text("Save (Ctrl+S)").clicked() {
                 app.save();
             }
         });
@@ -51,6 +51,8 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     body.show(ui, |ui| {
         ui.set_height(BODY_H);
         ui.set_width(ui.available_width());
+        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
+        combo_frame(ui, false);
         egui::ScrollArea::horizontal().scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden).show(ui, |ui| {
             ui.horizontal_top(|ui| match app.ribbon_tab {
                 RibbonTab::Home => home(app, ui),
@@ -119,20 +121,25 @@ fn file_menu(app: &mut App, ui: &mut Ui) {
 // ----------------------------------------------------------------------
 
 fn group(ui: &mut Ui, name: &str, add: impl FnOnce(&mut Ui)) {
-    ui.vertical(|ui| {
-        ui.set_height(BODY_H);
+    let top = ui.cursor().top();
+    let inner = ui.vertical(|ui| {
         ui.spacing_mut().item_spacing = vec2(2.0, 2.0);
-        ui.allocate_ui_with_layout(vec2(0.0, BODY_H - 16.0), Layout::left_to_right(Align::Min), |ui| {
-            add(ui);
-        });
-        ui.with_layout(Layout::bottom_up(Align::Center), |ui| {
-            ui.label(RichText::new(name).size(11.0).color(theme::MUTED));
-        });
+        let content = ui.horizontal_top(|ui| add(ui)).response.rect;
+        let label = ui.painter().layout_no_wrap(name.to_string(), FontId::proportional(11.0), theme::MUTED);
+        let w = content.width().max(label.size().x + 8.0);
+        let rest = (top + BODY_H - ui.cursor().top()).max(0.0);
+        let (r, _) = ui.allocate_exact_size(vec2(w, rest), Sense::hover());
+        ui.painter().galley(pos2(content.left() + (w - label.size().x) / 2.0, r.bottom() - label.size().y), label, theme::MUTED);
     });
-    let r = ui.available_rect_before_wrap();
-    ui.add_space(4.0);
-    ui.painter().vline(r.left() + 1.0, r.top() + 4.0..=r.top() + BODY_H - 4.0, Stroke::new(1.0, theme::BORDER));
+    let r = inner.response.rect;
+    ui.add_space(5.0);
+    ui.painter().vline(r.right() + 5.0, top + 4.0..=top + BODY_H - 4.0, Stroke::new(1.0, theme::BORDER));
     ui.add_space(6.0);
+}
+
+/// Ribbon buttons are frameless; combo boxes get a thin border.
+fn combo_frame(ui: &mut Ui, on: bool) {
+    ui.visuals_mut().widgets.inactive.bg_stroke = if on { Stroke::new(1.0, Color32::from_gray(180)) } else { Stroke::NONE };
 }
 
 /// A large icon button with a label under it.
@@ -155,6 +162,23 @@ fn small(ui: &mut Ui, text: impl Into<egui::WidgetText>, tip: &str) -> egui::Res
 
 fn toggle(ui: &mut Ui, on: bool, text: impl Into<egui::WidgetText>, tip: &str) -> egui::Response {
     ui.add(egui::Button::selectable(on, text).min_size(vec2(24.0, 22.0))).on_hover_text(tip)
+}
+
+/// A toggle showing a painted horizontal-alignment icon (0 left, 1 center, 2 right).
+fn align_toggle(ui: &mut Ui, on: bool, which: u8, tip: &str) -> egui::Response {
+    let resp = ui.add(egui::Button::selectable(on, " ").min_size(vec2(24.0, 22.0))).on_hover_text(tip);
+    let c = resp.rect.center();
+    let stroke = Stroke::new(1.3, Color32::from_gray(60));
+    for (i, w) in [12.0f32, 8.0, 12.0, 8.0].iter().enumerate() {
+        let y = c.y - 4.5 + i as f32 * 3.0;
+        let (x0, x1) = match which {
+            0 => (c.x - 6.0, c.x - 6.0 + w),
+            1 => (c.x - w / 2.0, c.x + w / 2.0),
+            _ => (c.x + 6.0 - w, c.x + 6.0),
+        };
+        ui.painter().hline(x0..=x1, y, stroke);
+    }
+    resp
 }
 
 /// Office color palette; returns the picked color.
@@ -231,7 +255,7 @@ fn home(app: &mut App, ui: &mut Ui) {
             if small(ui, "⎘ Copy", "Copy (Ctrl+C)").clicked() {
                 app.copy(false);
             }
-            if toggle(ui, app.format_painter.is_some(), "🖌 Format Painter", "Copy formatting from one place and apply it to another").clicked() {
+            if toggle(ui, app.format_painter.is_some(), "🖊 Format Painter", "Copy formatting from one place and apply it to another").clicked() {
                 if app.format_painter.is_some() {
                     app.format_painter = None;
                 } else {
@@ -244,6 +268,7 @@ fn home(app: &mut App, ui: &mut Ui) {
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
                 let cur_font = st.font_name.clone().unwrap_or_else(|| engine::style::DEFAULT_FONT.into());
+                combo_frame(ui, true);
                 egui::ComboBox::from_id_salt("font-name").width(130.0).selected_text(&cur_font).show_ui(ui, |ui| {
                     for f in crate::fonts::FONT_NAMES {
                         if ui.selectable_label(f == cur_font, f).clicked() {
@@ -260,6 +285,7 @@ fn home(app: &mut App, ui: &mut Ui) {
                         }
                     }
                 });
+                combo_frame(ui, false);
                 if small(ui, "A⁺", "Increase Font Size").clicked() {
                     app.change_font_size(1);
                 }
@@ -281,7 +307,7 @@ fn home(app: &mut App, ui: &mut Ui) {
                     app.toggle_font_flag(FontFlag::Strike);
                 }
                 borders_menu(app, ui);
-                let (apply, pick) = color_split(ui, "🪣", app.fill_color, "Fill Color", "No Fill");
+                let (apply, pick) = color_split(ui, "🎨", app.fill_color, "Fill Color", "No Fill");
                 if apply {
                     let c = app.fill_color;
                     app.apply_style("Fill Color", |s| s.fill = Some(c));
@@ -324,13 +350,13 @@ fn home(app: &mut App, ui: &mut Ui) {
                 }
             });
             ui.horizontal(|ui| {
-                if toggle(ui, st.h_align == HAlign::Left, "⫷", "Align Left").clicked() {
+                if align_toggle(ui, st.h_align == HAlign::Left, 0, "Align Left").clicked() {
                     app.set_h_align(HAlign::Left);
                 }
-                if toggle(ui, st.h_align == HAlign::Center, "☰", "Center").clicked() {
+                if align_toggle(ui, st.h_align == HAlign::Center, 1, "Center").clicked() {
                     app.set_h_align(HAlign::Center);
                 }
-                if toggle(ui, st.h_align == HAlign::Right, "⫸", "Align Right").clicked() {
+                if align_toggle(ui, st.h_align == HAlign::Right, 2, "Align Right").clicked() {
                     app.set_h_align(HAlign::Right);
                 }
                 if small(ui, "⇤", "Decrease Indent").clicked() {
@@ -374,6 +400,7 @@ fn home(app: &mut App, ui: &mut Ui) {
     group(ui, "Number", |ui| {
         ui.vertical(|ui| {
             let label = numfmt_util::RIBBON_FORMATS.iter().find(|(_, c)| *c == st.num_fmt).map(|(l, _)| l.to_string()).unwrap_or_else(|| numfmt_util::category_of(&st.num_fmt).to_string());
+            combo_frame(ui, true);
             egui::ComboBox::from_id_salt("numfmt").width(140.0).selected_text(label).show_ui(ui, |ui| {
                 let v = app.doc.wb.value(app.sheet, app.sel.active);
                 for (l, c) in numfmt_util::RIBBON_FORMATS {
@@ -387,6 +414,7 @@ fn home(app: &mut App, ui: &mut Ui) {
                     app.open_format_cells();
                 }
             });
+            combo_frame(ui, false);
             ui.horizontal(|ui| {
                 if small(ui, "$", "Accounting Number Format").clicked() {
                     app.set_number_format(numfmt_util::ACCOUNTING);
@@ -776,7 +804,8 @@ fn formulas(app: &mut App, ui: &mut Ui) {
             let mut cats: Vec<&str> = app.functions.iter().map(|f| f.category).collect();
             cats.sort();
             cats.dedup();
-            for chunk in cats.chunks(3) {
+            let per_row = cats.len().div_ceil(3).max(1);
+            for chunk in cats.chunks(per_row) {
                 ui.horizontal(|ui| {
                     for c in chunk {
                         ui.menu_button(format!("{} ▾", c), |ui| {
@@ -806,7 +835,7 @@ fn formulas(app: &mut App, ui: &mut Ui) {
         });
     });
     group(ui, "Formula Auditing", |ui| {
-        if big(ui, "⨍", "Show Formulas", "Show Formulas (Ctrl+`)").clicked() {
+        if big(ui, "ƒ", "Show Formulas", "Show Formulas (Ctrl+`)").clicked() {
             app.show_formulas = !app.show_formulas;
         }
     });
@@ -853,10 +882,10 @@ fn data(app: &mut App, ui: &mut Ui) {
         }
     });
     group(ui, "Data Tools", |ui| {
-        if big(ui, "⫼", "Text to Columns", "Split text into columns").clicked() {
+        if big(ui, "⊞", "Text to Columns", "Split text into columns").clicked() {
             app.dialog = Some(Dialog::TextToColumns { tab: true, comma: true, semicolon: false, space: false, other: String::new(), consecutive: false });
         }
-        if big(ui, "⧉", "Remove Duplicates", "Delete duplicate rows").clicked() {
+        if big(ui, "🗗", "Remove Duplicates", "Delete duplicate rows").clicked() {
             app.dialog = Some(Dialog::remove_duplicates(app));
         }
         if big(ui, "✔", "Data Validation", "Restrict the data that can be entered").clicked() {
@@ -889,13 +918,15 @@ fn view(app: &mut App, ui: &mut Ui) {
         if big(ui, "1:1", "100%", "Zoom to 100%").clicked() {
             app.set_zoom(1.0);
         }
-        ui.vertical(|ui| {
-            for z in [50, 75, 150, 200] {
-                if small(ui, format!("{}%", z), "").clicked() {
-                    app.set_zoom(z as f32 / 100.0);
+        for pair in [[50, 75], [150, 200]] {
+            ui.vertical(|ui| {
+                for z in pair {
+                    if small(ui, format!("{}%", z), &format!("Zoom to {}%", z)).clicked() {
+                        app.set_zoom(z as f32 / 100.0);
+                    }
                 }
-            }
-        });
+            });
+        }
     });
     group(ui, "Window", |ui| {
         ui.menu_button("❄ Freeze Panes ▾", |ui| {

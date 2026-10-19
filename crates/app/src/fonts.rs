@@ -125,6 +125,15 @@ const CANDIDATES: &[Candidates] = &[
     },
 ];
 
+/// Fallback fonts for symbols missing from the default UI font.
+const SYMBOL_FONTS: &[&str] = &[
+    "C:\\Windows\\Fonts\\seguisym.ttf",
+    "/System/Library/Fonts/Apple Symbols.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
+];
+
 /// Which families were loaded: name (lower-case) -> has bold face.
 static LOADED: OnceLock<HashMap<String, bool>> = OnceLock::new();
 static UI_FONT: OnceLock<bool> = OnceLock::new();
@@ -140,6 +149,20 @@ fn family_name(name: &str, bold: bool) -> String {
 /// Load fonts and register them with egui.
 pub fn install(ctx: &egui::Context) {
     let mut defs = FontDefinitions::default();
+    // Symbol fonts so ribbon icons (arrows, scissors, ...) render everywhere.
+    let mut symbols = Vec::new();
+    for (i, path) in SYMBOL_FONTS.iter().enumerate() {
+        if let Ok(bytes) = std::fs::read(path) {
+            let key = format!("symbols-{}", i);
+            defs.font_data.insert(key.clone(), Arc::new(FontData::from_owned(bytes)));
+            symbols.push(key);
+        }
+    }
+    for fam in [FontFamily::Proportional, FontFamily::Monospace] {
+        if let Some(list) = defs.families.get_mut(&fam) {
+            list.extend(symbols.iter().cloned());
+        }
+    }
     let fallback: Vec<String> = defs.families.get(&FontFamily::Proportional).cloned().unwrap_or_default();
     let mut loaded = HashMap::new();
     for c in CANDIDATES {

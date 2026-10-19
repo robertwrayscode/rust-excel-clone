@@ -79,7 +79,8 @@ pub fn apply(ctx: &egui::Context) {
             w.corner_radius = CornerRadius::same(2);
         }
         v.widgets.inactive.weak_bg_fill = Color32::TRANSPARENT;
-        v.widgets.inactive.bg_fill = Color32::from_rgb(0xFB, 0xFB, 0xFB);
+        v.widgets.inactive.bg_fill = Color32::WHITE;
+        v.widgets.inactive.bg_stroke = Stroke::new(1.0, Color32::from_rgb(0xB4, 0xB4, 0xB4));
         v.widgets.hovered.weak_bg_fill = Color32::from_rgb(0xE6, 0xE6, 0xE6);
         v.widgets.hovered.bg_fill = Color32::from_rgb(0xE6, 0xE6, 0xE6);
         v.widgets.hovered.bg_stroke = Stroke::new(1.0, Color32::from_rgb(0xC8, 0xC8, 0xC8));

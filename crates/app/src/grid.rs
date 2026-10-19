@@ -1736,7 +1736,7 @@ fn charts_ui(app: &mut App, ui: &mut egui::Ui, geo: &Geo, cells: ERect) {
     if n == 0 {
         return;
     }
-    let scroll_region = ERect::from_min_max(pos2(cells.left() + geo.frozen_w(), cells.top() + geo.frozen_h()), cells.max);
+    let (fr, fc) = (app.sheet_ref().freeze_rows, app.sheet_ref().freeze_cols);
     let pointer = ui.input(|i| i.pointer.interact_pos());
     for i in 0..n {
         let chart = app.sheet_ref().charts[i].clone();
@@ -1758,6 +1758,10 @@ fn charts_ui(app: &mut App, ui: &mut egui::Ui, geo: &Geo, cells: ERect) {
         if !rect.intersects(cells) {
             continue;
         }
+        // A chart anchored in a frozen pane is not clipped by that pane.
+        let left = if chart.anchor.col < fc { cells.left() } else { cells.left() + geo.frozen_w() };
+        let top = if chart.anchor.row < fr { cells.top() } else { cells.top() + geo.frozen_h() };
+        let scroll_region = ERect::from_min_max(pos2(left, top), cells.max);
         let painter = ui.painter_at(scroll_region);
         let data = crate::charts::extract(&app.doc.wb, app.sheet, &chart);
         let selected = app.selected_chart == Some(i);

@@ -223,6 +223,7 @@ impl App {
         if args.demo {
             app.doc.wb = crate::demo::build();
             app.doc.wb.recalculate();
+            app.reset_views();
         }
         if let Some(f) = &args.file {
             app.open_path(f.clone());
@@ -319,6 +320,8 @@ impl App {
         if self.sheet >= self.doc.wb.sheets.len() {
             self.sheet = 0;
         }
+        let r = self.merge_expand(Rect::single(CellPos::new(0, 0)));
+        self.sel.ranges = vec![r];
     }
 
     pub fn merge_expand(&self, mut r: Rect) -> Rect {
@@ -1218,7 +1221,7 @@ impl App {
     }
 
     /// Run scripted actions (testing aid for screenshots).
-    fn run_script_action(&mut self, a: &str) {
+    fn run_script_action(&mut self, ctx: &egui::Context, a: &str) {
         let (name, arg) = a.split_once(':').unwrap_or((a, ""));
         match name {
             "select" => {
@@ -1263,6 +1266,43 @@ impl App {
             "name_manager" => self.dialog = Some(Dialog::name_manager()),
             "goal_seek" => self.dialog = Some(Dialog::GoalSeek { set_cell: "B2".into(), to_value: String::new(), changing: String::new() }),
             "show_formulas" => self.show_formulas = true,
+            "save_as" => {
+                self.save_to(PathBuf::from(arg));
+            }
+            "open" => self.open_path(PathBuf::from(arg)),
+            "key" => {
+                // e.g. key:ctrl+shift+ArrowDown, key:F4, key:Enter
+                let mut m = Modifiers::NONE;
+                let mut key = None;
+                for part in arg.split('+') {
+                    match part.to_ascii_lowercase().as_str() {
+                        "ctrl" | "cmd" => {
+                            m.ctrl = !cfg!(target_os = "macos");
+                            m.mac_cmd = cfg!(target_os = "macos");
+                            m.command = true;
+                        }
+                        "shift" => m.shift = true,
+                        "alt" => m.alt = true,
+                        _ => key = Key::from_name(part),
+                    }
+                }
+                match key {
+                    Some(key) => {
+                        let ev = match key {
+                            Key::C if m.command => Event::Copy,
+                            Key::X if m.command => Event::Cut,
+                            Key::V if m.command => Event::Paste(crate::clipboard::get_text().unwrap_or_default()),
+                            _ => Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers: m },
+                        };
+                        if self.edit.is_some() {
+                            self.editor_event(ev);
+                        } else {
+                            self.grid_event(ctx, ev);
+                        }
+                    }
+                    None => eprintln!("unknown key in --action {}", a),
+                }
+            }
             _ => eprintln!("unknown --action {}", a),
         }
     }
@@ -1282,7 +1322,7 @@ impl eframe::App for App {
         if self.frame_no == 3 {
             let actions = std::mem::take(&mut self.args.actions);
             for a in &actions {
-                self.run_script_action(a);
+                self.run_script_action(&ctx, a);
             }
         }
 
@@ -1334,7 +1374,7 @@ impl eframe::App for App {
         if let Some(s) = &mut self.screenshot {
             if s.done.load(Ordering::SeqCst) {
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-            } else if !s.requested && self.frame_no >= 8 {
+            } else if !s.requested && self.frame_no >= 8 && ctx.input(|i| i.time) > 1.5 {
                 s.requested = true;
                 let path = s.path.clone();
                 let done = s.done.clone();

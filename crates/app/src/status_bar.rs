@@ -49,6 +49,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             // selection statistics
             if let Some(stats) = selection_stats(app) {
                 let (count, ncount, sum, min, max) = stats;
+                // Statistics use the active cell's number format, like Excel.
+                let code = app.active_style().num_fmt;
+                let fmt = |n: f64| fmt_with(n, &code);
                 if ncount > 0 {
                     ui.label(format!("Sum: {}", fmt(sum)));
                     if ncount > 1 {
@@ -66,8 +69,13 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     });
 }
 
-fn fmt(n: f64) -> String {
-    engine::value::format_number_general((n * 1e10).round() / 1e10)
+fn fmt_with(n: f64, code: &str) -> String {
+    let n = (n * 1e10).round() / 1e10;
+    if engine::numfmt::is_general(code) || code == "@" {
+        engine::value::format_number_general(n)
+    } else {
+        engine::numfmt::format_number(n, code).text
+    }
 }
 
 /// (count, numeric count, sum, min, max) of the selection, if it spans several cells.

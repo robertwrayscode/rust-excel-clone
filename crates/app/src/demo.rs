@@ -179,6 +179,7 @@ pub fn build() -> Workbook {
     wb.update_style(s2, r("D2:D11"), |st| st.num_fmt = "#,##0.00".into());
     wb.update_style(s2, r("C11:D11"), |st| st.bold = true);
     let sh2 = &mut wb.sheets[s2];
+    sh2.col_widths.insert(1, 80.0);
     sh2.col_widths.insert(2, 130.0);
     sh2.cond_formats.push(ConditionalFormat {
         range: r("E2:E9"),
