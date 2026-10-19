@@ -8,3 +8,8 @@ description = "Spreadsheet engine: workbook model, formula parser/evaluator, Exc
 [dependencies]
 chrono = "0.4"
 serde = { version = "1", features = ["derive"] }
+rust_xlsxwriter = "0.100"
+calamine = "0.37"
+quick-xml = "0.42"
+zip = { version = "9", default-features = false, features = ["deflate"] }
+csv = "1.4"
