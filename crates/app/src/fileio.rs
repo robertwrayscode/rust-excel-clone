@@ -5,14 +5,13 @@ use std::path::{Path, PathBuf};
 
 use engine::Workbook;
 
-pub const OPEN_EXTENSIONS: [&str; 6] = ["xlsx", "xlsm", "xls", "ods", "csv", "tsv"];
+pub const OPEN_EXTENSIONS: &[&str] = engine::io::OPEN_EXTENSIONS;
 
 pub fn open(path: &Path) -> Result<Workbook, String> {
     let mut wb = engine::io::open(path)?;
     if wb.sheets.is_empty() {
         wb.add_sheet(None);
     }
-    wb.recalculate();
     Ok(wb)
 }
 
@@ -32,7 +31,7 @@ pub fn ext(path: &Path) -> String {
 pub fn pick_open() -> Option<PathBuf> {
     rfd::FileDialog::new()
         .set_title("Open")
-        .add_filter("All Excel Files", &OPEN_EXTENSIONS)
+        .add_filter("All Excel Files", OPEN_EXTENSIONS)
         .add_filter("Excel Workbook", &["xlsx", "xlsm"])
         .add_filter("Excel 97-2003 Workbook", &["xls"])
         .add_filter("OpenDocument Spreadsheet", &["ods"])

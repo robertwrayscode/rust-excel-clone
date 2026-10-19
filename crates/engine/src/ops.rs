@@ -1525,6 +1525,14 @@ pub fn validate_input(wb: &Workbook, sheet: usize, p: CellPos, input: &str) -> R
         _ => None,
     };
     let fmt = |x: f64| crate::value::format_number_general(x);
+    let bounds = |min: f64, max: f64| -> String {
+        match (min.is_finite(), max.is_finite()) {
+            (true, true) => format!("between {} and {}", fmt(min), fmt(max)),
+            (true, false) => format!("greater than or equal to {}", fmt(min)),
+            (false, true) => format!("less than or equal to {}", fmt(max)),
+            _ => "valid".into(),
+        }
+    };
     match rule {
         ValidationRule::List(_) | ValidationRule::ListRange(_) => {
             let list = validation_list(wb, sheet, rule);
@@ -1536,18 +1544,18 @@ pub fn validate_input(wb: &Workbook, sheet: usize, p: CellPos, input: &str) -> R
         }
         ValidationRule::WholeNumber { min, max } => match num {
             Some(n) if n.fract() == 0.0 && n >= *min && n <= *max => Ok(()),
-            _ => Err(format!("The value must be a whole number between {} and {}.", fmt(*min), fmt(*max))),
+            _ => Err(format!("The value must be a whole number {}.", bounds(*min, *max))),
         },
         ValidationRule::Decimal { min, max } => match num {
             Some(n) if n >= *min && n <= *max => Ok(()),
-            _ => Err(format!("The value must be a number between {} and {}.", fmt(*min), fmt(*max))),
+            _ => Err(format!("The value must be a number {}.", bounds(*min, *max))),
         },
         ValidationRule::TextLength { min, max } => {
             let l = input.chars().count() as f64;
             if l >= *min && l <= *max {
                 Ok(())
             } else {
-                Err(format!("The text length must be between {} and {}.", fmt(*min), fmt(*max)))
+                Err(format!("The text length must be {}.", bounds(*min, *max)))
             }
         }
     }

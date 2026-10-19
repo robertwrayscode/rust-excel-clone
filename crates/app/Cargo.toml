@@ -13,7 +13,6 @@ path = "src/main.rs"
 engine = { path = "../engine" }
 eframe = { version = "0.37", default-features = false, features = ["default_fonts", "glow", "x11", "wayland", "clipboard", "links"] }
 egui = "0.37"
-egui_plot = "0.37"
 rfd = "0.17"
 arboard = { version = "3", default-features = false }
 dirs = "6"

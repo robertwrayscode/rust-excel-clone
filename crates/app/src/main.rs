@@ -1,6 +1,7 @@
 //! RExcel: a desktop spreadsheet application in the style of Microsoft Excel.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod actions;
 mod app;
 mod charts;
 mod clipboard;

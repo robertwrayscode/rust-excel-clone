@@ -33,23 +33,23 @@ impl CfFormat {
     }
 }
 
-/// Parse a rule operand ("=formula" or a constant) into an expression.
+/// Parse a rule operand (a formula stored without the leading '=', or a constant).
 fn operand(s: &str) -> Option<Expr> {
     let t = s.trim();
+    let t = t.strip_prefix('=').unwrap_or(t);
     if t.is_empty() {
         return None;
     }
-    if let Some(f) = t.strip_prefix('=') {
-        return parse_formula(f).ok();
+    if let Ok(p) = crate::workbook::parse_input(t) {
+        match p.value {
+            Value::Number(n) if p.formula.is_none() => return Some(Expr::Number(n)),
+            Value::Bool(b) if p.formula.is_none() => return Some(Expr::Bool(b)),
+            _ => {}
+        }
     }
-    match crate::workbook::parse_input(t) {
-        Ok(p) => Some(match p.value {
-            Value::Number(n) => Expr::Number(n),
-            Value::Bool(b) => Expr::Bool(b),
-            Value::Text(t) => Expr::Text(t),
-            _ => Expr::Text(t.to_string()),
-        }),
-        Err(_) => Some(Expr::Text(t.to_string())),
+    match parse_formula(t) {
+        Ok(Expr::Name(_)) | Err(_) => Some(Expr::Text(t.trim_matches('"').to_string())),
+        Ok(e) => Some(e),
     }
 }
 

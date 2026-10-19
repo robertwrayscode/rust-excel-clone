@@ -329,7 +329,7 @@ fn conditional_formats() {
     });
     s.cond_formats.push(ConditionalFormat {
         range: r("A1:A5"),
-        rule: CfRule::Expression { formula: "=A1=2".into(), style: CfStyle { italic: true, ..Default::default() } },
+        rule: CfRule::Expression { formula: "A1=2".into(), style: CfStyle { italic: true, ..Default::default() } },
     });
     s.cond_formats.push(ConditionalFormat {
         range: r("A1:A5"),
