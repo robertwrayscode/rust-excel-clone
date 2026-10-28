@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2DB872"/>
+      <stop offset="1" stop-color="#0E6B38"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFC83D"/>
+      <stop offset="1" stop-color="#F29A12"/>
+    </linearGradient>
+  </defs>
+  <!-- rounded app tile -->
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
+  <!-- soft shadow under the sheet -->
+  <rect x="200" y="220" width="640" height="600" rx="56" fill="#000" opacity="0.18"/>
+  <!-- the sheet -->
+  <rect x="184" y="196" width="640" height="600" rx="56" fill="#FFFFFF"/>
+  <!-- header row -->
+  <path d="M184 252 a56 56 0 0 1 56 -56 h528 a56 56 0 0 1 56 56 v76 h-640 z" fill="#C9EED8"/>
+  <!-- grid lines -->
+  <g stroke="#9CCFB1" stroke-width="10">
+    <line x1="184" y1="328" x2="824" y2="328"/>
+    <line x1="184" y1="445" x2="824" y2="445"/>
+    <line x1="184" y1="562" x2="824" y2="562"/>
+    <line x1="184" y1="679" x2="824" y2="679"/>
+    <line x1="344" y1="196" x2="344" y2="796"/>
+    <line x1="504" y1="196" x2="504" y2="796"/>
+    <line x1="664" y1="196" x2="664" y2="796"/>
+  </g>
+  <!-- rising bar chart -->
+  <rect x="384" y="560" width="92" height="196" rx="14" fill="#107C41"/>
+  <rect x="520" y="450" width="92" height="306" rx="14" fill="#21A366"/>
+  <rect x="656" y="340" width="92" height="416" rx="14" fill="url(#bar)"/>
+  <!-- "R" badge -->
+  <circle cx="262" cy="262" r="118" fill="#0E6B38" stroke="#FFFFFF" stroke-width="18"/>
+  <path d="M216 194 H268 A43 43 0 0 1 268 280 L314 330 H272 L252 290 V330 H216 Z M252 224 V256 H266 A16 16 0 0 0 266 224 Z" fill="#FFFFFF" fill-rule="evenodd"/>
+</svg>

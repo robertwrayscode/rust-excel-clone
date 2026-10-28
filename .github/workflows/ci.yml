@@ -6,6 +6,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Publish a GitHub release with this tag (e.g. v0.1.0); leave empty to just build"
+        required: false
+        default: ""
 
 env:
   CARGO_TERM_COLOR: always
@@ -72,8 +77,14 @@ jobs:
           APP=dist/RExcel.app
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
           cp target/${{ matrix.target }}/release/rexcel "$APP/Contents/MacOS/rexcel"
-          cp packaging/macos/Info.plist "$APP/Contents/Info.plist"
-          cd dist && zip -r ../${{ matrix.artifact }}.zip RExcel.app
+          VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          sed -e "s#<key>CFBundleShortVersionString</key><string>[^<]*</string>#<key>CFBundleShortVersionString</key><string>$VERSION</string>#" \
+              -e "s#<key>CFBundleVersion</key><string>[^<]*</string>#<key>CFBundleVersion</key><string>$VERSION</string>#" \
+              packaging/macos/Info.plist > "$APP/Contents/Info.plist"
+          cp crates/app/assets/icon/rexcel.icns "$APP/Contents/Resources/rexcel.icns"
+          # Ad-hoc sign the bundle so macOS reports an unidentified developer instead of a damaged app
+          codesign --force --deep --sign - "$APP"
+          cd dist && ditto -c -k --keepParent RExcel.app ../${{ matrix.artifact }}.zip
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: bash
@@ -88,7 +99,7 @@ jobs:
 
   release:
     name: Publish release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -100,4 +111,7 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*/*.zip
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: RExcel ${{ inputs.release_tag || github.ref_name }}
           generate_release_notes: true
