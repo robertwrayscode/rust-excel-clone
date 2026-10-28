@@ -78,6 +78,7 @@ jobs:
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
           cp target/${{ matrix.target }}/release/rexcel "$APP/Contents/MacOS/rexcel"
           cp packaging/macos/Info.plist "$APP/Contents/Info.plist"
+          cp crates/app/assets/icon/rexcel.icns "$APP/Contents/Resources/rexcel.icns"
           # Ad-hoc sign the bundle so macOS reports an unidentified developer instead of a damaged app
           codesign --force --deep --sign - "$APP"
           cd dist && ditto -c -k --keepParent RExcel.app ../${{ matrix.artifact }}.zip

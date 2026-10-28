@@ -16,6 +16,7 @@ mod numfmt_util;
 mod png;
 mod ribbon;
 mod sheet_tabs;
+mod spell;
 mod status_bar;
 mod theme;
 
@@ -61,7 +62,12 @@ fn main() -> eframe::Result {
             .with_title("Book1 - RExcel")
             .with_inner_size([1360.0, 860.0])
             .with_min_inner_size([640.0, 400.0])
-            .with_drag_and_drop(true),
+            .with_drag_and_drop(true)
+            .with_icon(std::sync::Arc::new(egui::IconData {
+                rgba: include_bytes!("../assets/icon/rexcel-128.rgba").to_vec(),
+                width: 128,
+                height: 128,
+            })),
         ..Default::default()
     };
     eframe::run_native(

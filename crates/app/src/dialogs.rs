@@ -213,6 +213,7 @@ pub fn show(app: &mut App, ctx: &Context) {
         }
     }
     find_dialog(app, ctx);
+    crate::spell::show(app, ctx);
     filter_popup(app, ctx);
 }
 

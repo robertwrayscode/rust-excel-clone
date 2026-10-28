@@ -112,6 +112,7 @@ pub enum RibbonTab {
     Insert,
     Formulas,
     Data,
+    Review,
     View,
 }
 
@@ -147,6 +148,7 @@ pub struct App {
     pub clip: Option<Clip>,
     pub dialog: Option<Dialog>,
     pub find: Option<crate::dialogs::FindState>,
+    pub spell: Option<crate::spell::SpellState>,
     pub ribbon_tab: RibbonTab,
     pub show_formulas: bool,
     pub show_headings: bool,
@@ -180,6 +182,7 @@ pub struct App {
 
 impl App {
     pub fn new(ctx: &egui::Context, args: Args) -> App {
+        crate::spell::preload();
         let mut app = App {
             doc: Doc::new(),
             sheet: 0,
@@ -190,6 +193,7 @@ impl App {
             clip: None,
             dialog: None,
             find: None,
+            spell: None,
             ribbon_tab: RibbonTab::Home,
             show_formulas: false,
             show_headings: true,
@@ -1062,6 +1066,7 @@ impl App {
             Key::F3 if shift => self.open_insert_function(),
             Key::F3 if cmd => self.dialog = Some(Dialog::name_manager()),
             Key::F5 => self.dialog = Some(Dialog::GoTo { text: String::new() }),
+            Key::F7 => self.start_spelling(),
             Key::F9 => {
                 self.doc.wb.recalculate();
                 self.touch();
@@ -1236,6 +1241,7 @@ impl App {
             "format_cells" => self.open_format_cells(),
             "find" => self.open_find(true),
             "insert_function" => self.open_insert_function(),
+            "spelling" => self.start_spelling(),
             "paste_special" => self.dialog = Some(Dialog::PasteSpecial(Default::default())),
             "sort" => self.open_custom_sort(),
             "copy" => self.copy(false),
@@ -1249,6 +1255,7 @@ impl App {
                     "insert" => RibbonTab::Insert,
                     "formulas" => RibbonTab::Formulas,
                     "data" => RibbonTab::Data,
+                    "review" => RibbonTab::Review,
                     "view" => RibbonTab::View,
                     _ => RibbonTab::Home,
                 }

@@ -20,7 +20,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         ui.spacing_mut().item_spacing.x = 2.0;
         file_menu(app, ui);
         ui.add_space(6.0);
-        for (tab, name) in [(RibbonTab::Home, "Home"), (RibbonTab::Insert, "Insert"), (RibbonTab::Formulas, "Formulas"), (RibbonTab::Data, "Data"), (RibbonTab::View, "View")] {
+        for (tab, name) in [(RibbonTab::Home, "Home"), (RibbonTab::Insert, "Insert"), (RibbonTab::Formulas, "Formulas"), (RibbonTab::Data, "Data"), (RibbonTab::Review, "Review"), (RibbonTab::View, "View")] {
             let sel = app.ribbon_tab == tab;
             let text = RichText::new(name).size(13.0).color(if sel { theme::ACCENT_DARK } else { theme::TEXT });
             let r = ui.add(egui::Button::new(if sel { text.strong() } else { text }).frame_when_inactive(false).min_size(vec2(58.0, 24.0)));
@@ -59,6 +59,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                 RibbonTab::Insert => insert(app, ui),
                 RibbonTab::Formulas => formulas(app, ui),
                 RibbonTab::Data => data(app, ui),
+                RibbonTab::Review => review(app, ui),
                 RibbonTab::View => view(app, ui),
             });
         });
@@ -788,6 +789,19 @@ fn insert(app: &mut App, ui: &mut Ui) {
     group(ui, "Symbols", |ui| {
         if big(ui, "ƒx", "Function", "Insert Function (Shift+F3)").clicked() {
             app.open_insert_function();
+        }
+    });
+}
+
+fn review(app: &mut App, ui: &mut Ui) {
+    group(ui, "Proofing", |ui| {
+        if big(ui, "✔", "Spelling", "Spelling (F7)\nCheck the spelling of text in the worksheet.").clicked() {
+            app.start_spelling();
+        }
+    });
+    group(ui, "Notes", |ui| {
+        if big(ui, "💬", "New Note", "Insert a note about the selected cell (Shift+F2)").clicked() {
+            app.edit_comment();
         }
     });
 }
