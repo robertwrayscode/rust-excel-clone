@@ -18,6 +18,18 @@ rfd = "0.17"
 arboard = { version = "3", default-features = false }
 dirs = "6"
 spellbook = "0.4"
+tiny-skia = { version = "0.11", default-features = false, features = ["std", "simd"] }
+# Fonts and PDF writer shared with RWord (same author, MIT).
+wordcore = { git = "https://github.com/robertwrayscode/rust-word-clone", rev = "80169acc041621771644325e01fb2bafd9e26e67" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString", "NSURL", "NSGeometry"] }
+objc2-app-kit = { version = "0.3", features = ["NSPrintInfo", "NSPrintOperation"] }
+objc2-pdf-kit = { version = "0.3", features = ["PDFDocument", "objc2-app-kit"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_Controls_Dialogs", "Win32_Storage_Xps", "Win32_System_Memory", "Win32_UI_Input_KeyboardAndMouse"] }
 
 [build-dependencies]
 winresource = "0.1"

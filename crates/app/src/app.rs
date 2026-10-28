@@ -149,6 +149,10 @@ pub struct App {
     pub dialog: Option<Dialog>,
     pub find: Option<crate::dialogs::FindState>,
     pub spell: Option<crate::spell::SpellState>,
+    /// File > Print view, when open.
+    pub print: Option<crate::print::PrintState>,
+    /// Print settings remembered between prints.
+    pub page_setup: crate::print::PageSetup,
     pub ribbon_tab: RibbonTab,
     pub show_formulas: bool,
     pub show_headings: bool,
@@ -183,6 +187,7 @@ pub struct App {
 impl App {
     pub fn new(ctx: &egui::Context, args: Args) -> App {
         crate::spell::preload();
+        crate::print::preload();
         let mut app = App {
             doc: Doc::new(),
             sheet: 0,
@@ -194,6 +199,8 @@ impl App {
             dialog: None,
             find: None,
             spell: None,
+            print: None,
+            page_setup: Default::default(),
             ribbon_tab: RibbonTab::Home,
             show_formulas: false,
             show_headings: true,
@@ -535,6 +542,32 @@ impl App {
     // files
     // ------------------------------------------------------------------
 
+    fn screenshot_tick(&mut self, ctx: &egui::Context) {
+        if let Some(s) = &mut self.screenshot {
+            if s.done.load(Ordering::SeqCst) {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            } else if !s.requested && self.frame_no >= 8 && ctx.input(|i| i.time) > 1.5 {
+                s.requested = true;
+                let path = s.path.clone();
+                let done = s.done.clone();
+                let c2 = ctx.clone();
+                ctx.request_screenshot(move |img| {
+                    let mut rgba = Vec::with_capacity(img.pixels.len() * 4);
+                    for p in &img.pixels {
+                        rgba.extend_from_slice(&p.to_srgba_unmultiplied());
+                    }
+                    let png = crate::png::encode_rgba(img.size[0] as u32, img.size[1] as u32, &rgba);
+                    if let Err(e) = std::fs::write(&path, png) {
+                        eprintln!("screenshot: {}", e);
+                    }
+                    done.store(true, Ordering::SeqCst);
+                    c2.request_repaint();
+                });
+            }
+            ctx.request_repaint();
+        }
+    }
+
     pub fn window_title(&self) -> String {
         format!("{}{} - RExcel", self.doc.title(), if self.doc.dirty { "*" } else { "" })
     }
@@ -809,7 +842,7 @@ impl App {
 
     fn decide_intercept(&mut self, ctx: &egui::Context) {
         let focused = ctx.memory(|m| m.focused());
-        let modal = self.dialog.as_ref().map(|d| d.is_modal()).unwrap_or(false) || self.filter_popup.is_some();
+        let modal = self.dialog.as_ref().map(|d| d.is_modal()).unwrap_or(false) || self.filter_popup.is_some() || self.print.is_some();
         self.intercept = if modal {
             Intercept::None
         } else if self.edit.is_some() {
@@ -1144,6 +1177,7 @@ impl App {
             Key::G if cmd => self.dialog = Some(Dialog::GoTo { text: String::new() }),
             Key::K if cmd => self.open_hyperlink(),
             Key::L if cmd && shift => self.toggle_autofilter(),
+            Key::P if cmd => self.open_print(),
             Key::N if cmd => self.request(Pending::New),
             Key::O if cmd => self.request(Pending::Open(None)),
             Key::S if cmd && shift => {
@@ -1242,6 +1276,33 @@ impl App {
             "find" => self.open_find(true),
             "insert_function" => self.open_insert_function(),
             "spelling" => self.start_spelling(),
+            "print" => self.open_print(),
+            "print_page" => {
+                if let (Some(ps), Ok(n)) = (self.print.as_mut(), arg.parse::<usize>()) {
+                    ps.page = n.saturating_sub(1);
+                }
+            }
+            "print_pdf" => {
+                // testing aid: write the print pages to a PDF
+                let jobs = crate::print::jobs(self, &self.page_setup.clone());
+                let pages = crate::print::layout(&self.doc.wb, &jobs, &self.page_setup.clone(), self.show_formulas);
+                let _ = std::fs::write(arg, crate::print::pdf_bytes(&pages, &self.doc.title()));
+            }
+            "print_setup" => {
+                // e.g. print_setup:landscape+gridlines+headings+fit
+                for part in arg.split('+') {
+                    let s = &mut self.page_setup;
+                    match part {
+                        "landscape" => s.landscape = true,
+                        "gridlines" => s.gridlines = true,
+                        "headings" => s.headings = true,
+                        "fit" => s.scaling = crate::print::Scaling::FitSheet,
+                        "numbers" => s.page_numbers = true,
+                        _ => {}
+                    }
+                }
+            }
+            "about" => self.dialog = Some(Dialog::About),
             "paste_special" => self.dialog = Some(Dialog::PasteSpecial(Default::default())),
             "sort" => self.open_custom_sort(),
             "copy" => self.copy(false),
@@ -1353,6 +1414,15 @@ impl eframe::App for App {
         self.process_events(&ctx);
         self.apply_editor_focus(&ctx);
 
+        if self.print.is_some() {
+            crate::print::show(self, ui);
+            crate::dialogs::show(self, &ctx);
+            let title = self.window_title();
+            ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
+            self.screenshot_tick(&ctx);
+            return;
+        }
+
         egui::Panel::top("ribbon")
             .frame(egui::Frame::new().fill(crate::theme::RIBBON_BG).inner_margin(egui::Margin::ZERO))
             .show(ui, |ui| crate::ribbon::show(self, ui));
@@ -1377,30 +1447,7 @@ impl eframe::App for App {
             ctx.request_repaint_after(std::time::Duration::from_millis(120));
         }
 
-        // automated screenshot
-        if let Some(s) = &mut self.screenshot {
-            if s.done.load(Ordering::SeqCst) {
-                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-            } else if !s.requested && self.frame_no >= 8 && ctx.input(|i| i.time) > 1.5 {
-                s.requested = true;
-                let path = s.path.clone();
-                let done = s.done.clone();
-                let c2 = ctx.clone();
-                ctx.request_screenshot(move |img| {
-                    let mut rgba = Vec::with_capacity(img.pixels.len() * 4);
-                    for p in &img.pixels {
-                        rgba.extend_from_slice(&p.to_srgba_unmultiplied());
-                    }
-                    let png = crate::png::encode_rgba(img.size[0] as u32, img.size[1] as u32, &rgba);
-                    if let Err(e) = std::fs::write(&path, png) {
-                        eprintln!("screenshot: {}", e);
-                    }
-                    done.store(true, Ordering::SeqCst);
-                    c2.request_repaint();
-                });
-            }
-            ctx.request_repaint();
-        }
+        self.screenshot_tick(&ctx);
     }
 }
 

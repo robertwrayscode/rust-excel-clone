@@ -102,11 +102,11 @@ fn file_menu(app: &mut App, ui: &mut Ui) {
         }
         ui.separator();
         if ui.add(egui::Button::new("Print...").shortcut_text("Ctrl+P")).clicked() {
-            app.message("Print", "Printing is not available in RExcel yet.");
+            app.open_print();
             ui.close();
         }
         if ui.button("About RExcel").clicked() {
-            app.message("About RExcel", "RExcel — a spreadsheet application written in Rust.\nEngine: formulas, functions, number formats, xlsx/csv I/O.\nUI: egui.");
+            app.dialog = Some(crate::dialogs::Dialog::About);
             ui.close();
         }
         ui.separator();
@@ -114,6 +114,8 @@ fn file_menu(app: &mut App, ui: &mut Ui) {
             app.request(Pending::Close);
             ui.close();
         }
+        ui.separator();
+        ui.label(RichText::new(format!("RExcel version {}", env!("CARGO_PKG_VERSION"))).size(11.0).color(theme::MUTED));
     });
 }
 

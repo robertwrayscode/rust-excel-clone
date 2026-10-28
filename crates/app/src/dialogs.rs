@@ -57,6 +57,7 @@ pub enum Dialog {
     Hyperlink { cell: CellPos, url: String, display: String },
     Size { rows: bool, value: String },
     Zoom { value: u32 },
+    About,
 }
 
 impl Dialog {
@@ -262,6 +263,36 @@ fn parse_cell(app: &App, t: &str) -> Option<CellPos> {
 
 fn show_dialog(app: &mut App, ctx: &Context, d: &mut Dialog) -> bool {
     match d {
+        Dialog::About => {
+            let mut done = false;
+            let open = window(ctx, "About RExcel", 340.0, |ui| {
+                ui.horizontal(|ui| {
+                    let id = egui::Id::unique("rexcel-about-icon");
+                    let tex = ui.ctx().data_mut(|d| d.get_temp::<egui::TextureHandle>(id)).unwrap_or_else(|| {
+                        let img = egui::ColorImage::from_rgba_unmultiplied([128, 128], include_bytes!("../assets/icon/rexcel-128.rgba"));
+                        let t = ui.ctx().load_texture("rexcel-about-icon", img, egui::TextureOptions::LINEAR);
+                        ui.ctx().data_mut(|d| d.insert_temp(id, t.clone()));
+                        t
+                    });
+                    ui.add(egui::Image::new(&tex).fit_to_exact_size(vec2(64.0, 64.0)));
+                    ui.vertical(|ui| {
+                        ui.label(RichText::new("RExcel").size(22.0).strong().color(theme::TEXT));
+                        ui.label(RichText::new(format!("Version {}", env!("CARGO_PKG_VERSION"))).size(14.0));
+                        ui.label(RichText::new("A spreadsheet app written in Rust.").color(theme::MUTED));
+                    });
+                });
+                ui.add_space(10.0);
+                ui.allocate_ui_with_layout(vec2(ui.available_width(), 26.0), egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.add(egui::Button::new(RichText::new("OK").color(Color32::WHITE)).fill(theme::ACCENT).min_size(vec2(72.0, 24.0))).clicked() {
+                        done = true;
+                    }
+                });
+                if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                    done = true;
+                }
+            });
+            open && !done
+        }
         Dialog::Message { title, text } => {
             let t = text.clone();
             let mut done = false;

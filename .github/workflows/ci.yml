@@ -77,7 +77,10 @@ jobs:
           APP=dist/RExcel.app
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
           cp target/${{ matrix.target }}/release/rexcel "$APP/Contents/MacOS/rexcel"
-          cp packaging/macos/Info.plist "$APP/Contents/Info.plist"
+          VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          sed -e "s#<key>CFBundleShortVersionString</key><string>[^<]*</string>#<key>CFBundleShortVersionString</key><string>$VERSION</string>#" \
+              -e "s#<key>CFBundleVersion</key><string>[^<]*</string>#<key>CFBundleVersion</key><string>$VERSION</string>#" \
+              packaging/macos/Info.plist > "$APP/Contents/Info.plist"
           cp crates/app/assets/icon/rexcel.icns "$APP/Contents/Resources/rexcel.icns"
           # Ad-hoc sign the bundle so macOS reports an unidentified developer instead of a damaged app
           codesign --force --deep --sign - "$APP"

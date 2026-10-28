@@ -1,6 +1,7 @@
 //! Embedded chart rendering (custom painted).
 
 use egui::{pos2, vec2, Align2, Color32, FontId, Painter, Pos2, Rect, Shape, Stroke, StrokeKind};
+
 use engine::address::CellPos;
 use engine::workbook::{Chart, ChartKind};
 use engine::{Value, Workbook};
@@ -121,12 +122,65 @@ fn fmt_tick(v: f64, step: f64) -> String {
 }
 
 /// Paint a chart into `rect`.
+/// Something charts can be drawn on: the screen (egui) or a printed page.
+pub trait Canvas {
+    fn rect_filled(&mut self, r: Rect, c: Color32);
+    fn polyline(&mut self, pts: &[Pos2], width: f32, c: Color32);
+    /// Fill a polygon that is star-shaped around its first point (pie slices, area quads).
+    fn polygon(&mut self, pts: &[Pos2], c: Color32);
+    fn circle(&mut self, center: Pos2, r: f32, c: Color32);
+    fn text_size(&self, text: &str, size: f32) -> egui::Vec2;
+    fn text(&mut self, pos: Pos2, align: Align2, text: &str, size: f32, c: Color32);
+}
+
+/// Drawing on screen.
+pub struct ScreenCanvas<'a> {
+    pub p: &'a Painter,
+}
+
+impl Canvas for ScreenCanvas<'_> {
+    fn rect_filled(&mut self, r: Rect, c: Color32) {
+        self.p.rect_filled(r, 0.0, c);
+    }
+    fn polyline(&mut self, pts: &[Pos2], width: f32, c: Color32) {
+        self.p.add(Shape::line(pts.to_vec(), Stroke::new(width, c)));
+    }
+    fn polygon(&mut self, pts: &[Pos2], c: Color32) {
+        if pts.len() < 3 {
+            return;
+        }
+        let mut mesh = egui::Mesh::default();
+        for q in pts {
+            mesh.colored_vertex(*q, c);
+        }
+        for j in 1..pts.len() as u32 - 1 {
+            mesh.add_triangle(0, j, j + 1);
+        }
+        self.p.add(Shape::mesh(mesh));
+    }
+    fn circle(&mut self, center: Pos2, r: f32, c: Color32) {
+        self.p.circle_filled(center, r, c);
+    }
+    fn text_size(&self, text: &str, size: f32) -> egui::Vec2 {
+        self.p.layout_no_wrap(text.to_string(), FontId::proportional(size), Color32::BLACK).size()
+    }
+    fn text(&mut self, pos: Pos2, align: Align2, text: &str, size: f32, c: Color32) {
+        self.p.text(pos, align, text, FontId::proportional(size), c);
+    }
+}
+
+/// Draw a chart on screen.
 pub fn paint(p: &Painter, rect: Rect, chart: &Chart, data: &ChartData, selected: bool) {
     p.rect(rect, 0.0, Color32::WHITE, Stroke::new(1.0, Color32::from_gray(if selected { 120 } else { 200 })), StrokeKind::Inside);
     let p = p.with_clip_rect(rect.intersect(p.clip_rect()));
+    draw(&mut ScreenCanvas { p: &p }, rect, chart, data);
+}
+
+/// Draw a chart's contents (without its frame).
+pub fn draw(p: &mut dyn Canvas, rect: Rect, chart: &Chart, data: &ChartData) {
     let text_c = Color32::from_gray(89);
-    let title_font = FontId::proportional(15.0);
-    let small = FontId::proportional(11.0);
+    let title_font = 15.0;
+    let small = 11.0;
     let mut top = rect.top() + 8.0;
     if !chart.title.is_empty() {
         p.text(pos2(rect.center().x, top), Align2::CENTER_TOP, &chart.title, title_font, text_c);
@@ -141,13 +195,13 @@ pub fn paint(p: &Painter, rect: Rect, chart: &Chart, data: &ChartData, selected:
     };
     let legend_h = if legend_items.is_empty() { 0.0 } else { 22.0 };
     if !legend_items.is_empty() {
-        let widths: Vec<f32> = legend_items.iter().map(|(t, _)| p.layout_no_wrap(t.clone(), small.clone(), text_c).size().x + 22.0).collect();
+        let widths: Vec<f32> = legend_items.iter().map(|(t, _)| p.text_size(t, small).x + 22.0).collect();
         let total: f32 = widths.iter().sum();
         let mut x = rect.center().x - total / 2.0;
         let y = rect.bottom() - 14.0;
         for ((t, c), w) in legend_items.iter().zip(widths) {
-            p.rect_filled(Rect::from_min_size(pos2(x, y - 4.0), vec2(8.0, 8.0)), 0.0, *c);
-            p.text(pos2(x + 12.0, y), Align2::LEFT_CENTER, t, small.clone(), text_c);
+            p.rect_filled(Rect::from_min_size(pos2(x, y - 4.0), vec2(8.0, 8.0)), *c);
+            p.text(pos2(x + 12.0, y), Align2::LEFT_CENTER, t, small, text_c);
             x += w;
         }
     }
@@ -156,7 +210,7 @@ pub fn paint(p: &Painter, rect: Rect, chart: &Chart, data: &ChartData, selected:
         return;
     }
     if pie {
-        paint_pie(&p, plot_outer, data);
+        paint_pie(p, plot_outer, data);
         return;
     }
     let all: Vec<f64> = data.series.iter().flat_map(|s| s.1.iter().flatten().copied()).collect();
@@ -181,8 +235,8 @@ pub fn paint(p: &Painter, rect: Rect, chart: &Chart, data: &ChartData, selected:
         }
         v
     };
-    let label_w = tick_labels.iter().map(|(_, s)| p.layout_no_wrap(s.clone(), small.clone(), text_c).size().x).fold(0.0, f32::max);
-    let cat_label_w = data.categories.iter().map(|s| p.layout_no_wrap(s.clone(), small.clone(), text_c).size().x).fold(0.0, f32::max).min(120.0);
+    let label_w = tick_labels.iter().map(|(_, s)| p.text_size(s, small).x).fold(0.0, f32::max);
+    let cat_label_w = data.categories.iter().map(|s| p.text_size(s, small).x).fold(0.0, f32::max).min(120.0);
     let plot = if horizontal {
         Rect::from_min_max(pos2(plot_outer.left() + cat_label_w + 8.0, plot_outer.top()), pos2(plot_outer.right(), plot_outer.bottom() - 18.0))
     } else {
@@ -200,11 +254,11 @@ pub fn paint(p: &Painter, rect: Rect, chart: &Chart, data: &ChartData, selected:
     for (v, s) in &tick_labels {
         let c = vmap(*v);
         if horizontal {
-            p.line_segment([pos2(c, plot.top()), pos2(c, plot.bottom())], Stroke::new(1.0, grid_c));
-            p.text(pos2(c, plot.bottom() + 3.0), Align2::CENTER_TOP, s, small.clone(), text_c);
+            p.polyline(&[pos2(c, plot.top()), pos2(c, plot.bottom())], 1.0, grid_c);
+            p.text(pos2(c, plot.bottom() + 3.0), Align2::CENTER_TOP, s, small, text_c);
         } else {
-            p.line_segment([pos2(plot.left(), c), pos2(plot.right(), c)], Stroke::new(1.0, grid_c));
-            p.text(pos2(plot.left() - 4.0, c), Align2::RIGHT_CENTER, s, small.clone(), text_c);
+            p.polyline(&[pos2(plot.left(), c), pos2(plot.right(), c)], 1.0, grid_c);
+            p.text(pos2(plot.left() - 4.0, c), Align2::RIGHT_CENTER, s, small, text_c);
         }
     }
     let n = data.categories.len().max(1);
@@ -215,7 +269,7 @@ pub fn paint(p: &Painter, rect: Rect, chart: &Chart, data: &ChartData, selected:
         let mut t = xlo;
         let mut guard = 0;
         while t <= xhi + xstep * 0.5 && guard < 50 {
-            p.text(pos2(xmap(t), plot.bottom() + 3.0), Align2::CENTER_TOP, fmt_tick(t, xstep), small.clone(), text_c);
+            p.text(pos2(xmap(t), plot.bottom() + 3.0), Align2::CENTER_TOP, &fmt_tick(t, xstep), small, text_c);
             t += xstep;
             guard += 1;
         }
@@ -223,11 +277,11 @@ pub fn paint(p: &Painter, rect: Rect, chart: &Chart, data: &ChartData, selected:
             let col = SERIES_COLORS[si % SERIES_COLORS.len()];
             for (i, v) in vals.iter().enumerate() {
                 if let (Some(y), Some(Some(x))) = (v, data.xs.get(i)) {
-                    p.circle_filled(pos2(xmap(*x), vmap(*y)), 3.5, col);
+                    p.circle(pos2(xmap(*x), vmap(*y)), 3.5, col);
                 }
             }
         }
-        p.line_segment([plot.left_bottom(), plot.right_bottom()], Stroke::new(1.0, Color32::from_gray(190)));
+        p.polyline(&[plot.left_bottom(), plot.right_bottom()], 1.0, Color32::from_gray(190));
         return;
     }
     // category labels
@@ -240,10 +294,9 @@ pub fn paint(p: &Painter, rect: Rect, chart: &Chart, data: &ChartData, selected:
         }
         let center = if horizontal { plot.top() + band * (i as f32 + 0.5) } else { plot.left() + band * (i as f32 + 0.5) };
         if horizontal {
-            p.text(pos2(plot.left() - 4.0, center), Align2::RIGHT_CENTER, c, small.clone(), text_c);
+            p.text(pos2(plot.left() - 4.0, center), Align2::RIGHT_CENTER, c, small, text_c);
         } else {
-            let g = p.layout(c.clone(), small.clone(), text_c, band.max(30.0));
-            p.galley(pos2(center - g.size().x / 2.0, plot.bottom() + 3.0), g, text_c);
+            p.text(pos2(center, plot.bottom() + 3.0), Align2::CENTER_TOP, c, small, text_c);
         }
     }
     let zero = vmap(0.0f64.clamp(lo, hi));
@@ -263,7 +316,7 @@ pub fn paint(p: &Painter, rect: Rect, chart: &Chart, data: &ChartData, selected:
                     } else {
                         Rect::from_min_max(pos2(plot.left() + start, zero.min(c)), pos2(plot.left() + start + bw * 0.95, zero.max(c)))
                     };
-                    p.rect_filled(r, 0.0, col);
+                    p.rect_filled(r, col);
                 }
             }
         }
@@ -279,15 +332,15 @@ pub fn paint(p: &Painter, rect: Rect, chart: &Chart, data: &ChartData, selected:
                     let fill = Color32::from_rgba_unmultiplied(col.r(), col.g(), col.b(), 200);
                     for w in pts.windows(2) {
                         let quad = vec![w[0], w[1], pos2(w[1].x, zero), pos2(w[0].x, zero)];
-                        p.add(Shape::convex_polygon(quad, fill, Stroke::NONE));
+                        p.polygon(&quad, fill);
                     }
                 }
                 if pts.len() >= 2 {
-                    p.add(Shape::line(pts.clone(), Stroke::new(2.25, col)));
+                    p.polyline(&pts, 2.25, col);
                 }
                 if chart.kind == ChartKind::Line {
                     for q in &pts {
-                        p.circle_filled(*q, 3.0, col);
+                        p.circle(*q, 3.0, col);
                     }
                 }
             }
@@ -296,13 +349,13 @@ pub fn paint(p: &Painter, rect: Rect, chart: &Chart, data: &ChartData, selected:
     }
     // axis line
     if horizontal {
-        p.line_segment([pos2(zero, plot.top()), pos2(zero, plot.bottom())], Stroke::new(1.0, Color32::from_gray(190)));
+        p.polyline(&[pos2(zero, plot.top()), pos2(zero, plot.bottom())], 1.0, Color32::from_gray(190));
     } else {
-        p.line_segment([pos2(plot.left(), zero), pos2(plot.right(), zero)], Stroke::new(1.0, Color32::from_gray(190)));
+        p.polyline(&[pos2(plot.left(), zero), pos2(plot.right(), zero)], 1.0, Color32::from_gray(190));
     }
 }
 
-fn paint_pie(p: &Painter, area: Rect, data: &ChartData) {
+fn paint_pie(p: &mut dyn Canvas, area: Rect, data: &ChartData) {
     let Some((_, vals)) = data.series.first() else { return };
     let total: f64 = vals.iter().flatten().filter(|v| **v > 0.0).sum();
     if total <= 0.0 {
@@ -320,27 +373,23 @@ fn paint_pie(p: &Painter, area: Rect, data: &ChartData) {
         let col = SERIES_COLORS[i % SERIES_COLORS.len()];
         // one triangle-fan mesh per slice (no seams), plus an anti-aliased rim
         let steps = ((sweep / std::f32::consts::TAU) * 96.0).ceil().max(2.0) as usize;
-        let mut mesh = egui::Mesh::default();
-        mesh.colored_vertex(c, col);
+        let mut fan = vec![c];
         let mut rim = Vec::with_capacity(steps + 1);
         for j in 0..=steps {
             let a = a0 + sweep * j as f32 / steps as f32;
             let q = c + vec2(a.cos(), a.sin()) * r;
-            mesh.colored_vertex(q, col);
+            fan.push(q);
             rim.push(q);
         }
-        for j in 0..steps as u32 {
-            mesh.add_triangle(0, j + 1, j + 2);
-        }
-        p.add(Shape::mesh(mesh));
-        p.add(Shape::line(rim, Stroke::new(1.0, col)));
+        p.polygon(&fan, col);
+        p.polyline(&rim, 1.0, col);
         // separator
-        p.line_segment([c, c + vec2(a0.cos(), a0.sin()) * r], Stroke::new(1.5, Color32::WHITE));
+        p.polyline(&[c, c + vec2(a0.cos(), a0.sin()) * r], 1.5, Color32::WHITE);
         // percentage label
         let mid = a0 + sweep / 2.0;
         if sweep > 0.25 {
             let lp = c + vec2(mid.cos(), mid.sin()) * r * 0.65;
-            p.text(lp, Align2::CENTER_CENTER, format!("{:.0}%", v / total * 100.0), FontId::proportional(11.0), Color32::WHITE);
+            p.text(lp, Align2::CENTER_CENTER, &format!("{:.0}%", v / total * 100.0), 11.0, Color32::WHITE);
         }
         a0 += sweep;
     }
